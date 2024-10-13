@@ -29,7 +29,7 @@ void commArray_del(CommArray *array){
 int commArray_adjust(CommArray *array, uint64_t len){
 	if(!array) return -1;
 	if(!array->size) return -2;
-	int len_bit = 64-__builtin_clzll(array->len);
+	int len_bit = 64-__builtin_clzll(len);
 	if(!array->data){
 		array->data = malloc((1<<len_bit)*array->size);
 		array->len = len_bit;
@@ -44,11 +44,11 @@ int commArray_adjust(CommArray *array, uint64_t len){
 int commArray_check(CommArray *array, uint64_t len){
 	if(!array) return -1;
 	if(!array->size) return -2;
-	int len_bit = 64-__builtin_clzll(array->len);
+	int len_bit = 64-__builtin_clzll(len);
 	if(!array->data){
 		return -3;
 	}
-	if(array->len == len_bit)
+	if(array->len >= len_bit)
 		return 0;
 }
 int commArray_set(CommArray *array, void *item, uint64_t index){

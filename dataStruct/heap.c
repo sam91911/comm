@@ -198,7 +198,25 @@ int commFHeap_remove(CommFHeap *fheap){
 	return 0;
 }
 
-int commBHeap_init(CommBHeap *bheap, CommHeapCmp cmp);
+static void bheapify(CommHeapCmp cmp, CommArray *array, uint64_t len, uint64_t cur){
+	if(2*cur+1 < len){
+		bheapify(cmp, array, len, 2*cur+1);
+		const int left_cmp = cmp((void *)(array->data+array->size*cur), (void *)(array->data+array->size*(2*cur+1)));
+		//pass
+	}
+	bheapify(cmp, array, len, 2*cur+2);
+}
+
+int commBHeap_init(CommBHeap *bheap, CommHeapCmp cmp, CommArray *array, uint64_t len){
+	if(!bheap) return -1;
+	if(!cmp) return -1;
+	if(!array) return -1;
+	if(commArray_check(array, len) != 0) return -1;
+	bheap->cmp = cmp;
+	bheap->array = array;
+	bheapify(cmp, array, len, 0);
+	return 0;
+}
 int commBHeap_del(CommBHeap *bheap);
 int commBHeap_insert(CommBHeap *bheap, void *data);
 void * commBHeap_get(CommBHeap *bheap);
