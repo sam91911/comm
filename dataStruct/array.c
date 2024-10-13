@@ -10,9 +10,8 @@ int commArray_init(CommArray *array, uint64_t len, size_t size, char align){
 	 * */
 	if(!array) return -1;
 	array->align = align;
-	int size_clz = 63-__builtin_clzll(size-1);
 	if(align){
-		array->size = (1<<size_clz);
+		array->size = (size+7) & ~7;
 	}else{
 		array->size = size;
 	}

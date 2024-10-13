@@ -2,7 +2,7 @@
 
 CC=gcc
 CFLAGS=-O3 -std=c99
-TARGETS=array.o dsforest.o
+TARGETS=array.o pool.o dsforest.o rbtree.o
 
 setup: $(TARGETS)
 	echo setup
