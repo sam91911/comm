@@ -16,7 +16,7 @@ int commFHeap_init(CommFHeap *fheap, CommHeapCmp cmp, CommPool *pool){
 	if(!cmp) return -1;
 	if(!pool) return -1;
 	if(pool->size != 56) return -2;
-	fheap->min = min;
+	fheap->min = NULL;
 	fheap->cmp = cmp;
 	fheap->pool = pool;
 	return 0;
@@ -53,8 +53,8 @@ int commFHeap_insert(CommFHeap *fheap, void *data){
 		fheap->min = (uint64_t *)target;
 		return 0;
 	}
-	const int cmp_result = fheap->cmp(data, cmp->data);
 	node *root = (node *)fheap->min;
+	const int cmp_result = fheap->cmp(data, root->data);
 	if(cmp_result > 0){
 		target->right = root->right;
 		root->right = target;
@@ -169,12 +169,12 @@ int commFHeap_remove(CommFHeap *fheap){
 	if(!fheap->min){
 		return 0;
 	}
-	node *min = (node *)fheep->min;
+	node *min = (node *)fheap->min;
 	node *undeal = min->right;
 	node *min_child = min->child;
 	node *dealed = NULL;
 	node *nxt;
-	commPool_free(fheap->pool, (void *)fheep->min);
+	commPool_free(fheap->pool, (void *)fheap->min);
 	while(min_child != NULL){
 		nxt = min_child->right;
 		min_child->parent = NULL;
@@ -198,13 +198,30 @@ int commFHeap_remove(CommFHeap *fheap){
 	return 0;
 }
 
-static void bheapify(CommHeapCmp cmp, CommArray *array, uint64_t len, uint64_t cur){
+static void array_swap(CommArray *array, uint64_t index1, uint64_t index2){
+	char swap[array->size];
+	memcpy(swap, array->data+array->size*index1, array->size);
+	memcpy(array->data+array->size*index1, array->data+array->size*index2, array->size);
+	memcpy(array->data+array->size*index2, swap, array->size);
+	return;
+}
+
+static void bheapify_recur(CommHeapCmp cmp, CommArray *array, uint64_t len, uint64_t cur){
 	if(2*cur+1 < len){
-		bheapify(cmp, array, len, 2*cur+1);
+		bheapify_recur(cmp, array, len, 2*cur+1);
 		const int left_cmp = cmp((void *)(array->data+array->size*cur), (void *)(array->data+array->size*(2*cur+1)));
-		//pass
+		if(left_cmp > 0){
+			array_swap(array, cur, 2*cur+1);
+		}
 	}
-	bheapify(cmp, array, len, 2*cur+2);
+	if(2*cur+2 < len){
+		bheapify_recur(cmp, array, len, 2*cur+2);
+		const int right_cmp = cmp((void *)(array->data+array->size*cur), (void *)(array->data+array->size*(2*cur+1)));
+		if(right_cmp > 0){
+			array_swap(array, cur, 2*cur+2);
+		}
+	}
+	return;
 }
 
 int commBHeap_init(CommBHeap *bheap, CommHeapCmp cmp, CommArray *array, uint64_t len){
@@ -214,10 +231,72 @@ int commBHeap_init(CommBHeap *bheap, CommHeapCmp cmp, CommArray *array, uint64_t
 	if(commArray_check(array, len) != 0) return -1;
 	bheap->cmp = cmp;
 	bheap->array = array;
-	bheapify(cmp, array, len, 0);
+	bheap->len = len;
+	bheapify_recur(cmp, array, len, 0);
 	return 0;
 }
-int commBHeap_del(CommBHeap *bheap);
-int commBHeap_insert(CommBHeap *bheap, void *data);
-void * commBHeap_get(CommBHeap *bheap);
-int commBHeap_remove(CommBHeap *bheap);
+int commBHeap_del(CommBHeap *bheap){
+	return 0;
+}
+
+static void bheap_insert_loop(CommHeapCmp cmp, CommArray *array, uint64_t cur){
+	const int cmp_result = cmp((void *)(array->data+array->size*((cur-1)/2)), array->data+array->size*cur);
+	if(cmp_result > 0){
+		array_swap(array, (cur-1)/2, cur);
+	}
+	return;
+}
+
+int commBHeap_insert(CommBHeap *bheap, void *data){
+	if(!bheap) return -1;
+	if(!bheap->cmp) return -1;
+	if(!data) return -1;
+	if(!bheap->array) return -1;
+	CommArray *array = bheap->array;
+	const uint64_t len = bheap->len++;
+	commArray_adjust(array, bheap->len);
+	uint64_t cur = len;
+	memcpy(array->data+array->size*len, data, array->size);
+	while(cur != 0){
+		bheap_insert_loop(bheap->cmp, array, cur);
+		cur = (cur-1)/2;
+	}
+	return 0;
+}
+void * commBHeap_get(CommBHeap *bheap){
+	if(!bheap) return NULL;
+	if(!bheap->array) return NULL;
+	return (void *)bheap->array->data;
+}
+
+static void bheap_remove_recur(CommHeapCmp cmp, CommArray *array, uint64_t len, uint64_t cur){
+	if(2*cur+1 < len){
+		const int left_cmp = cmp((void *)(array->data+array->size*cur), (void *)(array->data+array->size*(2*cur+1)));
+		if(left_cmp > 0){
+			array_swap(array, cur, 2*cur+1);
+			bheap_remove_recur(cmp, array, len, 2*cur+1);
+			return;
+		}
+	}
+	if(2*cur+2 < len){
+		const int right_cmp = cmp((void *)(array->data+array->size*cur), (void *)(array->data+array->size*(2*cur+1)));
+		if(right_cmp > 0){
+			array_swap(array, cur, 2*cur+2);
+			bheap_remove_recur(cmp, array, len, 2*cur+2);
+			return;
+		}
+	}
+	return;
+}
+
+int commBHeap_remove(CommBHeap *bheap){
+	if(!bheap) return -1;
+	if(!bheap->cmp) return -1;
+	if(!bheap->array) return -1;
+	if(bheap->len == 0) return 0;
+	const uint64_t len = --bheap->len;
+	CommArray *array = bheap->array;
+	array_swap(array, 0, len);
+	bheap_remove_recur(bheap->cmp, array, len, 0);
+	return 0;
+}
