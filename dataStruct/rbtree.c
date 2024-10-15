@@ -17,7 +17,7 @@ int commRBTree_init(CommRBTree *rbtree, CommRBTreeCmp cmp, CommRBTreePrint print
 	if(!rbtree) return -1;
 	if(!cmp) return -1;
 	if(!pool) return -1;
-	if(pool->size != 40) return -2;
+	if(pool->size < 40) return -2;
 	rbtree->len = 0;
 	rbtree->cmp = cmp;
 	rbtree->print = print;
@@ -153,7 +153,7 @@ static node * lift(CommRBTree *rbtree, node *item){
 				right->color = BLACK;
 				return item;
 			}else{
-				rotate_right(rbtree, grand);
+				rotate_left(rbtree, grand);
 				grand->color = RED;
 				parent->color = BLACK;
 				item->color = RED;
@@ -331,7 +331,7 @@ static void replace_data(CommRBTree *rbtree, void *data, node *item){
 static node * insert_assure(CommRBTree *rbtree, void *data, node *cur){
 	const char status = node_status(cur);
 	if((status&0x04)&&(status&0x01)){
-		int cmp_result = rbtree->cmp(data, cur->data);
+		const int cmp_result = rbtree->cmp(data, cur->data);
 		if(cmp_result == 0){
 			replace_data(rbtree, data, cur);
 			return 0;
@@ -479,6 +479,7 @@ int commRBTree_insert(CommRBTree *rbtree, void *data){
 		new_node->right = NULL;
 		new_node->data = data;
 		new_node->color = BLACK;
+		rbtree->root = (uint64_t *)new_node;
 		return 0;
 	}
 	while(1){
@@ -514,7 +515,26 @@ void * commRBTree_get(CommRBTree *rbtree, void *data){
 
 static node * remove_assure(CommRBTree *rbtree, void *data, node *cur){
 	const char status = node_status(cur);
+	const int parent_cmp = rbtree->cmp(data, cur->parent->data);
 	if((!(status&0x05))&&(cur->parent != NULL)){
+		if((parent_cmp < 0)&&(cur == cur->parent->right)){
+			span(rbtree, cur);
+			const int cur_cmp = rbtree->cmp(data, cur->data);
+			if(cur_cmp == 0){
+				if(cur == cur->parent->right){
+					cur->parent->right = NULL;
+				}else{
+					cur->parent->left = NULL;
+				}
+				commPool_free(rbtree->pool, cur);
+				return 0;
+			}
+			if(cur_cmp > 0){
+				return cur->right;
+			}else{
+				return cur->left;
+			}
+		}
 		return span(rbtree, cur);
 	}
 	return cur;
