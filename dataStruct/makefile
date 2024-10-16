@@ -6,7 +6,7 @@ TARGETS=array.o pool.o dsforest.o rbtree.o heap.o list.o queue.o stack.o
 TESTFILES=pool.o rbtree.o
 
 setup: $(TARGETS)
-	echo setup
+	@echo $(shell pwd)
 test: test_exc
 	./test_exc
 test_exc: test.o $(TESTFILES)
