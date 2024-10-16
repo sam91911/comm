@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "pool.h"
 
-typedef int (*CommListCmp)(void *, void *);
+typedef int (*CommListCmp)(void *, void *, void *);
 
 typedef struct {
 	uint64_t *head;
@@ -19,6 +19,6 @@ int commList_insert_front(CommList *list, void *data);
 int commList_insert_end(CommList *list, void *data);
 void *commList_get(CommList *list, int index);
 int commList_remove(CommList *list, int index);
-uint64_t commList_search(CommList *list, CommListCmp cmp, void *data);
+int commList_search(CommList *list, CommListCmp cmp, void *data, void *arg);
 
 #endif

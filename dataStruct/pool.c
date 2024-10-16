@@ -9,7 +9,7 @@ CommPool *commPool_new(size_t size, uint64_t capacity){
 
 	//ceiling the capacity to the power of 2
 	const int capacity_bit = 64-__builtin_clzll(capacity-1);
-	const uint64_t real_capacity = (1<<capacity_bit);
+	const uint64_t real_capacity = (1ULL<<capacity_bit);
 
 	CommPool *target = malloc(real_size*real_capacity+40);
 
@@ -48,18 +48,22 @@ void *commPool_get(CommPool *pool){
 		return (void *)target;
 	}
 	//check whether the pool is full
-	if(pool->stack_top <= pool->capacity){
+	if(pool->stack_top < pool->capacity){
 		//pool not full
 
 		//return address(target) is first item out of the stack_top, meanwhile increase the stack_top
-		const char *target = pool->pool+((pool->stack_top++)*pool->size);
+		const char *target = pool->pool+((pool->stack_top)*pool->size);
+		pool->stack_top++;
 		//return char * to void * using type casting
 		return (void *)target;
 	}
-	//pool is full, allocate new pool
+	//pool is full, check next pool
+	if(pool->nxt){
+		return commPool_get(pool->nxt);
+	}
 
 	//create new pool and attech to next
-	CommPool *new_pool = commPool_new(pool->size, pool->capacity);
+	CommPool *new_pool = commPool_new(pool->size, pool->capacity*2);
 	pool->nxt = new_pool;
 	return commPool_get(new_pool);
 }

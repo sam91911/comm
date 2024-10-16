@@ -5,15 +5,18 @@
 #include <stdint.h>
 #include "pool.h"
 
-typedef int (*CommRBTreeCmp)(void *, void *);
-typedef void (*CommRBTreePrint)(void *);
-typedef void (*CommRBTreeDel)(void *);
+typedef int (*CommRBTreeCmp)(void *, void *, void *);
+typedef void (*CommRBTreePrint)(void *, void *);
+typedef void (*CommRBTreeDel)(void *, void *);
 
 typedef struct{
 	uint64_t len;
 	CommRBTreeCmp cmp;
 	CommRBTreePrint print;
 	CommRBTreeDel del;
+	void *cmp_arg;
+	void *print_arg;
+	void *del_arg;
 	uint64_t *root;
 	CommPool *pool;
 } CommRBTree;

@@ -2,7 +2,7 @@
 
 CC=gcc
 CFLAGS=-O3 -std=c99
-TARGETS=array.o pool.o dsforest.o rbtree.o heap.o
+TARGETS=array.o pool.o dsforest.o rbtree.o heap.o list.o queue.o stack.o
 TESTFILES=pool.o rbtree.o
 
 setup: $(TARGETS)

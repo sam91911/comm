@@ -22,6 +22,9 @@ int commRBTree_init(CommRBTree *rbtree, CommRBTreeCmp cmp, CommRBTreePrint print
 	rbtree->cmp = cmp;
 	rbtree->print = print;
 	rbtree->del = del;
+	rbtree->cmp_arg = NULL;
+	rbtree->print_arg = NULL;
+	rbtree->del_arg = NULL;
 	rbtree->root = NULL;
 	rbtree->pool = pool;
 	return 0;
@@ -32,7 +35,7 @@ static void tree_del(CommRBTree *rbtree, node *node){
 	tree_del(rbtree, node->right);
 	tree_del(rbtree, node->left);
 	if(rbtree->del){
-		rbtree->del(node->data);
+		rbtree->del(node->data, rbtree->del_arg);
 	}
 	commPool_free(rbtree->pool, (void *)node);
 	return;
@@ -286,9 +289,9 @@ static node * succ_node(CommRBTree *rbtree, node *item){
 	node *child = item->right;
 	if(child != 0){
 		//has right tree;
-		while(child->right != 0){
+		while(child->left != 0){
 			//right going until end
-			child = child->right;
+			child = child->left;
 		}
 		return child;
 	}
@@ -302,8 +305,8 @@ static node * succ_node(CommRBTree *rbtree, node *item){
 		}
 		child = parent->right;
 		if(child != 0){
-			while(child->right != 0){
-				child = child->right;
+			while(child->left != 0){
+				child = child->left;
 			}
 			return child;
 		}else{
@@ -322,7 +325,7 @@ static int swap_succ(CommRBTree *rbtree, node *item){
 
 static void replace_data(CommRBTree *rbtree, void *data, node *item){
 	if(rbtree->del){
-		rbtree->del(item->data);
+		rbtree->del(item->data, rbtree->del_arg);
 	}
 	item->data = data;
 	return;
@@ -331,7 +334,7 @@ static void replace_data(CommRBTree *rbtree, void *data, node *item){
 static node * insert_assure(CommRBTree *rbtree, void *data, node *cur){
 	const char status = node_status(cur);
 	if((status&0x04)&&(status&0x01)){
-		const int cmp_result = rbtree->cmp(data, cur->data);
+		const int cmp_result = rbtree->cmp(data, cur->data, rbtree->cmp_arg);
 		if(cmp_result == 0){
 			replace_data(rbtree, data, cur);
 			return 0;
@@ -350,7 +353,7 @@ static node * insert_assure(CommRBTree *rbtree, void *data, node *cur){
 }
 
 static node * insert_loop(CommRBTree *rbtree, void *data, node *cur){
-	const int cmp_result = rbtree->cmp(data, cur->data);
+	const int cmp_result = rbtree->cmp(data, cur->data, rbtree->cmp_arg);
 	if(cmp_result == 0){
 		replace_data(rbtree, data, cur);
 		return 0;
@@ -370,7 +373,7 @@ static node * insert_loop(CommRBTree *rbtree, void *data, node *cur){
 		if(child->color == BLACK){
 			return child;
 		}
-		const int child_cmp = rbtree->cmp(data, child->data);
+		const int child_cmp = rbtree->cmp(data, child->data, rbtree->cmp_arg);
 		if(child_cmp == 0){
 			replace_data(rbtree, data, child);
 			return 0;
@@ -424,7 +427,7 @@ static node * insert_loop(CommRBTree *rbtree, void *data, node *cur){
 		if(child->color == BLACK){
 			return child;
 		}
-		const int child_cmp = rbtree->cmp(data, child->data);
+		const int child_cmp = rbtree->cmp(data, child->data, rbtree->cmp_arg);
 		if(child_cmp == 0){
 			replace_data(rbtree, data, child);
 			return 0;
@@ -500,7 +503,7 @@ void * commRBTree_get(CommRBTree *rbtree, void *data){
 	node *cur = (node *)rbtree->root;
 	int cmp_result;
 	while(cur != NULL){
-		cmp_result = rbtree->cmp(data, cur->data);
+		cmp_result = rbtree->cmp(data, cur->data, rbtree->cmp_arg);
 		if(cmp_result == 0){
 			return cur->data;
 		}
@@ -515,16 +518,19 @@ void * commRBTree_get(CommRBTree *rbtree, void *data){
 
 static node * remove_assure(CommRBTree *rbtree, void *data, node *cur){
 	const char status = node_status(cur);
-	const int parent_cmp = rbtree->cmp(data, cur->parent->data);
+	const int parent_cmp = rbtree->cmp(data, cur->parent->data, rbtree->cmp_arg);
 	if((!(status&0x05))&&(cur->parent != NULL)){
 		if((parent_cmp < 0)&&(cur == cur->parent->right)){
 			span(rbtree, cur);
-			const int cur_cmp = rbtree->cmp(data, cur->data);
+			const int cur_cmp = rbtree->cmp(data, cur->data, rbtree->cmp_arg);
 			if(cur_cmp == 0){
 				if(cur == cur->parent->right){
 					cur->parent->right = NULL;
 				}else{
 					cur->parent->left = NULL;
+				}
+				if(rbtree->del){
+					rbtree->del(cur->data, rbtree->del_arg);
 				}
 				commPool_free(rbtree->pool, cur);
 				return 0;
@@ -541,7 +547,7 @@ static node * remove_assure(CommRBTree *rbtree, void *data, node *cur){
 }
 
 static node * remove_loop(CommRBTree *rbtree, void *data, node *cur){
-	int cmp_result = rbtree->cmp(data, cur->data);
+	int cmp_result = rbtree->cmp(data, cur->data, rbtree->cmp_arg);
 	if(cmp_result == 0){
 		node *right = cur->right;
 		node *left = cur->left;
@@ -559,7 +565,7 @@ static node * remove_loop(CommRBTree *rbtree, void *data, node *cur){
 				left->color = BLACK;
 			}
 			if(rbtree->del){
-				rbtree->del(cur->data);
+				rbtree->del(cur->data, rbtree->del_arg);
 			}
 			commPool_free(rbtree->pool, (void *)cur);
 			return 0;
@@ -576,7 +582,7 @@ static node * remove_loop(CommRBTree *rbtree, void *data, node *cur){
 			right->parent = parent;
 			right->color = BLACK;
 			if(rbtree->del){
-				rbtree->del(cur->data);
+				rbtree->del(cur->data, rbtree->del_arg);
 			}
 			commPool_free(rbtree->pool, (void *)cur);
 			return 0;
@@ -592,12 +598,12 @@ static node * remove_loop(CommRBTree *rbtree, void *data, node *cur){
 		if(child->color == BLACK){
 			return child;
 		}
-		const int child_cmp = rbtree->cmp(data, child->data);
+		const int child_cmp = rbtree->cmp(data, child->data, rbtree->cmp_arg);
 		if(child_cmp == 0){
 			if(child->right == NULL){
 				cur->right = NULL;
 				if(rbtree->del){
-					rbtree->del(cur->data);
+					rbtree->del(cur->data, rbtree->del_arg);
 				}
 				commPool_free(rbtree->pool, (void *)child);
 				return 0;
@@ -618,12 +624,12 @@ static node * remove_loop(CommRBTree *rbtree, void *data, node *cur){
 		if(child->color == BLACK){
 			return child;
 		}
-		const int child_cmp = rbtree->cmp(data, child->data);
+		const int child_cmp = rbtree->cmp(data, child->data, rbtree->cmp_arg);
 		if(child_cmp == 0){
 			if(child->right == NULL){
 				cur->left = NULL;
 				if(rbtree->del){
-					rbtree->del(cur->data);
+					rbtree->del(cur->data, rbtree->del_arg);
 				}
 				commPool_free(rbtree->pool, (void *)child);
 				return 0;
@@ -640,7 +646,7 @@ static node * remove_loop(CommRBTree *rbtree, void *data, node *cur){
 }
 
 static node *remove_root(CommRBTree *rbtree, void *data, node *cur){
-	int cmp_result = rbtree->cmp(data, cur->data);
+	int cmp_result = rbtree->cmp(data, cur->data, rbtree->cmp_arg);
 	if(cmp_result == 0){
 		node *right = cur->right;
 		node *left = cur->left;
@@ -650,7 +656,7 @@ static node *remove_root(CommRBTree *rbtree, void *data, node *cur){
 				left->parent = NULL;
 			}
 			if(rbtree->del){
-				rbtree->del(cur->data);
+				rbtree->del(cur->data, rbtree->del_arg);
 			}
 			commPool_free(rbtree->pool, (void *)cur);
 			return NULL;
@@ -659,7 +665,7 @@ static node *remove_root(CommRBTree *rbtree, void *data, node *cur){
 			rbtree->root = (uint64_t *)right;
 			right->parent = NULL;
 			if(rbtree->del){
-				rbtree->del(cur->data);
+				rbtree->del(cur->data, rbtree->del_arg);
 			}
 			commPool_free(rbtree->pool, (void *)cur);
 			return NULL;
@@ -675,12 +681,12 @@ static node *remove_root(CommRBTree *rbtree, void *data, node *cur){
 		if(child->color == BLACK){
 			return child;
 		}
-		const int child_cmp = rbtree->cmp(data, child->data);
+		const int child_cmp = rbtree->cmp(data, child->data, rbtree->cmp_arg);
 		if(child_cmp == 0){
 			if(child->right == NULL){
 				cur->right = NULL;
 				if(rbtree->del){
-					rbtree->del(child->data);
+					rbtree->del(child->data, rbtree->del_arg);
 				}
 				commPool_free(rbtree->pool, (void *)child);
 				return NULL;
@@ -701,12 +707,12 @@ static node *remove_root(CommRBTree *rbtree, void *data, node *cur){
 		if(child->color == BLACK){
 			return child;
 		}
-		const int child_cmp = rbtree->cmp(data, child->data);
+		const int child_cmp = rbtree->cmp(data, child->data, rbtree->cmp_arg);
 		if(child_cmp == 0){
 			if(child->right == NULL){
 				cur->left = NULL;
 				if(rbtree->del){
-					rbtree->del(child->data);
+					rbtree->del(child->data, rbtree->del_arg);
 				}
 				commPool_free(rbtree->pool, (void *)child);
 				return NULL;
@@ -752,15 +758,15 @@ uint64_t *commRBTree_succ(CommRBTree *rbtree, uint64_t *item){
 static void print_recur(CommRBTree *rbtree, char type, node *cur){
 	if(cur == NULL) return;
 	if(type&0x01){
-		rbtree->print(cur->data);
+		rbtree->print(cur->data, rbtree->print_arg);
 	}
 	print_recur(rbtree, type, cur->left);
 	if(type&0x02){
-		rbtree->print(cur->data);
+		rbtree->print(cur->data, rbtree->print_arg);
 	}
 	print_recur(rbtree, type, cur->right);
 	if(type&0x04){
-		rbtree->print(cur->data);
+		rbtree->print(cur->data, rbtree->print_arg);
 	}
 	return;
 }

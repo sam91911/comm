@@ -31,13 +31,13 @@ int commArray_adjust(CommArray *array, uint64_t len){
 	if(!array->size) return -2;
 	int len_bit = 64-__builtin_clzll(len);
 	if(!array->data){
-		array->data = malloc((1<<len_bit)*array->size);
+		array->data = malloc((1ULL<<len_bit)*array->size);
 		array->len = len_bit;
 		return 0;
 	}
 	if(array->len == len_bit)
 		return 0;
-	array->data = realloc(array->data, (1<<len_bit)*array->size);
+	array->data = realloc(array->data, (1ULL<<len_bit)*array->size);
 	array->len = len_bit;
 	return 0;
 }
@@ -54,7 +54,7 @@ int commArray_check(CommArray *array, uint64_t len){
 int commArray_set(CommArray *array, void *item, uint64_t index){
 	if(!array) return -1;
 	if(!array->data) return -2;
-	if(index >= (1<<array->len))
+	if(index >= (1ULL<<array->len))
 		commArray_adjust(array, index+1);
 	memcpy(array->data+(index*array->size), item, array->size);
 	return 0;
@@ -62,7 +62,7 @@ int commArray_set(CommArray *array, void *item, uint64_t index){
 void * commArray_get(CommArray *array, uint64_t index){
 	if(!array) return NULL;
 	if(!array->data) return NULL;
-	if(index >= (1<<array->len)) return NULL;
+	if(index >= (1ULL<<array->len)) return NULL;
 	return array->data+(index*array->size);
 }
 
