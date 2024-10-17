@@ -11,29 +11,25 @@ uint64_t commGFPoly_insert(uint64_t *poly, uint64_t x, uint64_t len){
 	}
 	return rt;
 }
-int commGFPoly_RMatrix(uint64_t *x, uint64_t *RMatrix, uint64_t len){
+int commGFPoly_reverse_poly(uint64_t *x, uint64_t *poly, uint64_t len, uint64_t index){
 	if(!x) return -1;
-	if(!RMatrix) return -1;
-	uint64_t *tmp;
+	if(!poly) return -1;
 	uint64_t eff;
+	memset(poly, 0, len*8);
+	poly[0] = 1;
+	eff = 1;
 	for(uint64_t i = 0; i < len; i++){
-		tmp = RMatrix+len*i;
-		memset(tmp, 0, len*8);
-		tmp[0] = 1;
-		eff = 1;
-		for(uint64_t j = 0; j < len; j++){
-			if(j == i){
-				continue;
-			}
-			eff = commGF_mul(eff, commGF_inv(x[i]^x[j]));
-			for(uint64_t k = len-1; k > 0; k--){
-				tmp[k] = commGF_mul(tmp[k], x[j])^tmp[k-1];
-			}
-			tmp[0] = commGF_mul(tmp[0], x[j]);
+		if(i == index){
+			continue;
 		}
-		for(uint64_t j = 0; j < len; j++){
-			tmp[j] = commGF_mul(eff, tmp[j]);
+		eff = commGF_mul(eff, commGF_inv(x[index]^x[i]));
+		for(uint64_t j = len-1; j > 0; j--){
+			poly[j] = commGF_mul(poly[j], x[i])^poly[j-1];
 		}
+		poly[0] = commGF_mul(poly[0], x[i]);
+	}
+	for(uint64_t i = 0; i < len; i++){
+		poly[i] = commGF_mul(eff, poly[i]);
 	}
 	return 0;
 }
@@ -63,6 +59,28 @@ int commGFPoly_FIFO_insert(int filein, int fileout, uint64_t x, uint64_t len){
 	uint64_t remain = 0;
 	char write_buffer[BUFFER_SIZE];
 	uint64_t write_buffer_pt = 0;
+	if(8*len >= BUFFER_SIZE){
+		for(;;){
+			read_size = read(filein, buffer, 8*len);
+			if(read_size < 0) break;
+			if(read_size < 8*len){
+				memset(buffer+read_size, 0, 8*len-read_size);
+			}
+			result = commGFPoly_insert((uint64_t *)buffer, x, len);
+			if((BUFFER_SIZE - write_buffer_pt) < 8){
+				if(write(fileout, write_buffer, write_buffer_pt) == -1) return -1;
+				write_buffer_pt = 0;
+			}
+			*(uint64_t *)(write_buffer+write_buffer_pt) = result;
+			write_buffer_pt += 8;
+			read_buffer_pt += len*8;
+		}
+		if(write_buffer_pt > 0){
+			if(write(fileout, write_buffer, write_buffer_pt) == -1) return -1;
+		}
+		if(read_size < 0) return (int)read_size;
+		return 0;
+	}
 	for(;;){
 		read_size = read(filein, read_buffer, BUFFER_SIZE);
 		if(read_size < 0) break;
@@ -128,6 +146,25 @@ int commGFPoly_FIFO_reverse(int filein, int fileout, uint64_t *poly, uint64_t le
 	uint64_t read_buffer_pt = 0;
 	uint64_t write_buffer_pt = 0;
 	uint64_t buffer[len];
+	if(8*len >= BUFFER_SIZE){
+		for(;;){
+			read_size = read(filein, read_buffer, BUFFER_SIZE);
+			if(read_size < 0) return -1;
+			read_buffer_pt = 0;
+			while(read_buffer_pt < read_size){
+				for(uint64_t i = 0; i < len; i++){
+					buffer[i] = commGF_mul(poly[i], *(uint64_t *)(read_buffer+read_buffer_pt));
+				}
+				if(write(fileout, buffer, 8*len) == -1) return -1;
+				read_buffer_pt += 8;
+			}
+			if(read_size < BUFFER_SIZE){
+				break;
+			}
+		}
+		if(read_size < 0) return (int)read_size;
+		return 0;
+	}
 	for(;;){
 		read_size = read(filein, read_buffer, BUFFER_SIZE);
 		if(read_size < 0) return -1;

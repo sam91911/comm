@@ -9,7 +9,7 @@
 #include "GF.h"
 
 uint64_t commGFPoly_insert(uint64_t *poly, uint64_t x, uint64_t len);
-int commGFPoly_RMatrix(uint64_t *x, uint64_t *RMatrix, uint64_t len);
+int commGFPoly_reverse_poly(uint64_t *x, uint64_t *poly, uint64_t len, uint64_t index);
 int commGFPoly_reverse(uint64_t *y, uint64_t *RMatrix, uint64_t *poly, uint64_t len);
 int commGFPoly_FIFO_insert(int filein, int fileout, uint64_t x, uint64_t len);
 int commGFPoly_FIFO_reverse(int filein, int fileout, uint64_t *poly, uint64_t len);
