@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "GF.h"
 #include "GFPoly.h"
@@ -12,45 +14,46 @@ static uint64_t rand64(){
 }
 
 int main(int argc, char **argv){
+	if(argc < 2) return 0;
 	int len = 16;
-	int loop = 1<<12;
-	uint64_t src[len];
-	uint64_t x[len];
-	uint64_t y[len];
+	uint64_t key[len];
 	uint64_t RMatrix[len*len];
-	uint64_t reverse[len];
-	int result;
-	for(int i = 0; i < loop; i++){
-		for(int j = 0; j < len; j++){
-			src[j] = rand64();
-			x[j] = rand64();
-		}
-		for(int j = 0; j < len; j++){
-			y[j] = commGFPoly_insert(src, x[j], len);
-		}
-		commGFPoly_RMatrix(x, RMatrix, len);
-		commGFPoly_reverse(y, RMatrix, reverse, len);
-		int result = 0;
-		for(int j = 0; j < len; j++){
-			if(src[j] != reverse[j])
-				result = 1;
-		}
-		if(result != 0){
-			printf("\n");
-			for(int j = 0; j < len; j++){
-				printf("%016lx\t", src[j]);
-			}
-			printf("\n");
-			for(int j = 0; j < len; j++){
-				printf("%016lx\t", x[j]);
-			}
-			printf("\n");
-			for(int j = 0; j < len; j++){
-				printf("%016lx\t", reverse[j]);
-			}
-			printf("\n");
-		}
-		printf("loop:%d\r", i);
+	char path_buffer[256];
+	for(int i = 0; i < len; i++){
+		key[i] = rand64();
 	}
+	int file_target = open(argv[1], O_RDONLY);
+	int fileout;
+	if(file_target <= 0) return -1;
+	for(int i = 0; i < len; i++){
+		sprintf(path_buffer, "%016lX_insert", key[i]);
+		lseek(file_target, 0, SEEK_SET);
+		fileout = open(path_buffer, O_WRONLY|O_CREAT, 0666);
+		if(fileout <= 0) return -1;
+		commGFPoly_FIFO_insert(file_target, fileout, key[i], len);
+		close(fileout);
+	}
+	close(file_target);
+	commGFPoly_RMatrix(key, RMatrix, len);
+	for(int i = 0; i < len; i++){
+		sprintf(path_buffer, "%016lX_insert", key[i]);
+		file_target = open(path_buffer, O_RDONLY);
+		sprintf(path_buffer, "%016lX_reverse", key[i]);
+		fileout = open(path_buffer, O_WRONLY|O_CREAT, 0666);
+		commGFPoly_FIFO_reverse(file_target, fileout, RMatrix+i*len, len);
+		close(file_target);
+		close(fileout);
+	}
+	int file_reverse[len];
+	for(int i = 0; i < len; i++){
+		sprintf(path_buffer, "%016lX_reverse", key[i]);
+		file_reverse[i] = open(path_buffer, O_RDONLY);
+	}
+	file_target = open("result", O_WRONLY|O_CREAT, 0666);
+	commGFPoly_FIFO_combine(file_reverse, file_target, len);
+	for(int i = 0; i < len; i++){
+		close(file_reverse[i]);
+	}
+	close(file_target);
 	return 0;
 }
