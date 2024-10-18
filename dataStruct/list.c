@@ -12,11 +12,14 @@ int commList_init(CommList *list, CommPool *pool){
 }
 
 static void del_loop(CommList *list){
-	if(!list->head) return;
 	CommPool *pool = list->pool;
-	uint64_t *nxt = (uint64_t *)(list->head[0]);
+	uint64_t *nxt = (uint64_t *)list->head[0];
+	uint64_t *cur = list->head;
 	commPool_free(pool, (void *)(list->head));
-	list->head = (uint64_t *)((uint64_t)nxt^(uint64_t)(list->head));
+	list->head = nxt;
+	if(nxt){
+		nxt[0] ^= (uint64_t)cur;
+	}
 	return;
 }
 
@@ -138,4 +141,21 @@ int commList_search(CommList *list, CommListCmp cmp, void *data, void *arg){
 		index++;
 	}
 	return -2;
+}
+void *commList_iter(CommList *list, CommListIter *iter){
+	if(!list) return 0;
+	if(!iter) return 0;
+	if(iter->cur == 0) return 0;
+	uint64_t *nxt = (uint64_t *)((uint64_t)iter->post^iter->cur[0]);
+	void * data = (void *)iter->cur[1];
+	iter->post = iter->cur;
+	iter->cur = nxt;
+	return data;
+}
+int commList_iter_init(CommList *list, CommListIter *iter){
+	if(!list) return -1;
+	if(!iter) return -1;
+	iter->post = 0;
+	iter->cur = list->head;
+	return 0;
 }
